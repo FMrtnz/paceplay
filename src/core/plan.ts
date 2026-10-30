@@ -1,13 +1,13 @@
-export type Level='debutant'|'intermediaire'|'avance';
+export type Level='beginner'|'intermediate'|'advanced';
 export type Kind='warmup'|'accel'|'recover'|'cooldown';
 export interface Phase{kind:Kind;dur:number}
 export interface Plan{phases:Phase[];total:number;distKm:number;sig:string;seed:number;n:number}
-// A/R en secondes, vitesses en km/h
+// A = acceleration, R = recovery (seconds); vE = easy speed, vA = acceleration speed (km/h)
 export const LEVELS:Record<Level,{label:string;A:number;R:number;vE:number;vA:number}>={
-  debutant:{label:'Débutant',A:30,R:90,vE:7,vA:8.5},
-  intermediaire:{label:'Intermédiaire',A:45,R:75,vE:9,vA:11},
-  avance:{label:'Avancé',A:60,R:60,vE:10.5,vA:13.5}};
-const STEP=15; // pas de variation δ (s)
+  beginner:{label:'Débutant',A:30,R:90,vE:7,vA:8.5},
+  intermediate:{label:'Intermédiaire',A:45,R:75,vE:9,vA:11},
+  advanced:{label:'Avancé',A:60,R:60,vE:10.5,vA:13.5}};
+const STEP=15; // variation step δ (s)
 const round30=(x:number)=>Math.round(x/30)*30;
 const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x));
 export function rng(seed:number){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
@@ -36,7 +36,7 @@ export function durationForDistance(km:number,level:Level):number{
   const p=LEVELS[level],f=p.A/(p.A+p.R),v=(1-f)*p.vE+f*p.vA;
   return Math.max(600,Math.ceil(km*3600/v/60)*60);
 }
-/** Teste seed, seed+1… jusqu'à une signature absente de `recent` (max 50 essais). */
+/** Tries seed, seed+1… until a signature absent from `recent` is found (max 50 attempts). */
 export function pickPlan(T:number,level:Level,seed:number,recent:string[]):{plan:Plan;repeated:boolean}{
   let first:Plan|null=null;
   for(let k=0;k<50;k++){const p=buildPlan(T,level,seed+k);first??=p;if(!recent.includes(p.sig))return{plan:p,repeated:false}}

@@ -4,7 +4,7 @@ export function haversine(a:Fix,b:Fix){const R=6371000,r=Math.PI/180,dl=(b.lat-a
 export class Tracker{
   last:Fix|null=null;speed=0;rejected=0;accSum=0;n=0;
   constructor(public dist=0){}
-  /** Retourne les mètres ajoutés. Rejette précision >30 m, sauts >25 km/h, gigue/positions répétées. */
+  /** Returns meters added. Rejects accuracy >30 m, jumps >25 km/h, jitter and repeated positions. */
   add(f:Fix):number{
     if(f.acc>30){this.rejected++;return 0}
     if(!this.last){this.last=f;this.note(f);return 0}

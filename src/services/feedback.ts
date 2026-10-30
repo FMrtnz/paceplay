@@ -1,5 +1,5 @@
-/** Sons (Web Audio) et vibreur. Le vibreur n'existe pas sur Safari iOS : ignoré sans erreur.
- *  L'audio doit être déverrouillé par un geste de l'utilisateur (bouton Partir / Reprendre). */
+/** Sounds (Web Audio) and vibration. Vibration does not exist on Safari iOS: silently ignored.
+ *  Audio must be unlocked by a user gesture (Start / Resume button). */
 let ctx:AudioContext|null=null;
 export const soundOn=()=>{try{return localStorage.getItem('pp_sound')!=='off'}catch{return true}};
 export const setSound=(on:boolean)=>{try{localStorage.setItem('pp_sound',on?'on':'off')}catch{}};

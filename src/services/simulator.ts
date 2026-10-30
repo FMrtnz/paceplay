@@ -1,5 +1,5 @@
 import type{Fix}from'./gps';
-/** Course simulée à ~2,8 m/s ; un faux saut de 500 m toutes les 37 s pour tester le filtrage. */
+/** Simulated run at ~2.8 m/s; a fake 500 m jump every 37 s to test the filter. */
 export function simulate(onFix:(f:Fix)=>void):()=>void{
   let lat=48.85,k=0;
   const id=setInterval(()=>{k++;lat+=2.8/111320;
