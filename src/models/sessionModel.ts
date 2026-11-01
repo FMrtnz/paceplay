@@ -1,10 +1,12 @@
 import type { Level } from './constants';
+import type { RunDetail, RunLog } from './detailModel';
 import type { Plan } from './planModel';
 
 export interface Clock { startedAt: number; pausedMs: number; pausedAt: number | null }
 export interface RunConfig { mode: 'time' | 'dist'; val: number; level: Level; sim: boolean }
 /** Session saved on every tick so it can resume after a page reload. */
-export interface ActiveSession { plan: Plan; cfg: RunConfig; clock: Clock; dist: number }
+/** `log` is absent on sessions saved before detail recording existed. */
+export interface ActiveSession { plan: Plan; cfg: RunConfig; clock: Clock; dist: number; log?: RunLog }
 
 /** Raw outcome of a run, before XP and badges are applied. */
 export interface RunOutcome {
@@ -14,6 +16,7 @@ export interface RunOutcome {
   challenges: number;
   progress: number; // 0..1
   source: string;
+  detail?: RunDetail; // per-km and per-phase figures (absent when the run could not be tracked)
 }
 
 /** Elapsed time in seconds, computed from timestamps only. */

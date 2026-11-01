@@ -14,37 +14,56 @@ npm install && npm run dev
 
 ```
 src/
-  models/        MODEL: data and business rules
-    constants.ts     business constants (levels, labels, XP rules, timings)
+  models/        MODEL: data and business rules, pure functions (no React, no DOM)
+    vocabulary.ts    ALL user-facing words (levels, phases, screen titles, trophies, messages)
+    constants.ts     numbers and rules (levels' paces, XP, timings, pace thresholds)
     planModel.ts     build and pick interval plans (pure, seeded)
-    sessionModel.ts  clock, current phase, progress, goal checks (pure)
-    trackerModel.ts  GPS distance filter
-    rewardModel.ts   XP and badges (pure)
-    progressModel.ts player progress: applyRun, selectors, legacy-data migration (pure)
+    sessionModel.ts  clock, current phase, progress, goal checks
+    trackerModel.ts  GPS distance filter + smoothed current pace
+    paceModel.ts     pace maths (min/km)
+    detailModel.ts   live recording of a run (per-km marks, per-phase distance) → per-km / per-phase detail
+    rewardModel.ts   XP and trophies
+    progressModel.ts player progress: applyRun, removeRun, legacy-data migration
+    statsModel.ts    weekly totals, calendar heatmap, week streak, matches grouped by month
+    recordsModel.ts  personal records
+    matchModel.ts    one match → rows for the km / speed-up tabs
+    shareCardModel.ts texts printed on the share image
     storage.ts       the only file that touches localStorage
   controllers/   CONTROLLER: hooks that own state and expose actions
     useAppController.ts       current screen, chains the other controllers
     useSetupController.ts     goal, level, options, plan generation, sound preference
-    useRunController.ts       one live session: timers, GPS, autosave, sound cues
-    useProgressController.ts  XP, history, badges
+    useRunController.ts       one live session: timers, recording, autosave, sound and voice cues
+    useRunSensors.ts          GPS / simulator and screen wake lock
+    useProgressController.ts  XP, history, trophies and the figures built from them
+    useShareController.ts     share sheet: preview, photo, share / download
   views/         VIEW: display only
-    pages/           one file per screen
-    components/      reusable pieces (Snitch, ChoiceGroup, BadgeCard, PhaseList)
-  services/      browser APIs: GPS, audio/voice, wake lock, simulator (loaded on demand)
+    pages/           Home (Locker Room), Config (Team Sheet), Preview (Game Plan), Run (The Pitch),
+                     Result (Final Whistle), Progress (tabs), Match (tabs), Trophy Room
+    components/      reusable pieces (tabs, charts, heatmap, bottom nav, share sheet…)
+  services/      browser APIs: GPS, audio/voice, wake lock, share, simulator and share-image drawing (both loaded on demand)
   utils/         formatting helpers
   App.tsx        root: plugs the app controller into the pages
 ```
 
 Data flow: model → controller (hook) → view. Views receive data and callbacks as props and never
-touch storage. Models are pure functions: no React, no DOM, unit-tested next to their file.
+touch storage. Models are unit-tested next to their file (`npm test`).
 
 Rules of thumb:
-- Business logic goes in `models/`, state and side effects in `controllers/`, JSX in `views/`.
+- Words go in `models/vocabulary.ts`, business logic in `models/`, state and side effects in
+  `controllers/`, JSX in `views/`.
 - Keep files under ~150 lines; split when they grow.
-- Persisted field names (`P`, `distM`, `sig`, `challenges`, badge ids, `pp_*` keys) must never be
-  renamed without a migration in `progressModel.normalizeProgress`.
+- Persisted field names (`P`, `distM`, `sig`, `challenges`, `detail`, `log`, trophy ids, `pp_*` keys)
+  must never be renamed without a migration in `progressModel.normalizeProgress`.
 - `useRunController`'s interval effect has no dependency list on purpose: it is re-created on
   every render so the end-of-run handler always sees fresh values.
+- Matches saved before pace tracking have no `detail`: every screen must keep working without it.
+
+## Features
+
+- Live pace (current, smoothed over ~25 s, and average) and a spoken pace after each speed-up.
+- Every match keeps its pace per kilometre and per phase (GPS only; paces over less than a minute are marked ≈).
+- Progress: matches by month, records, weekly trends, calendar heatmap and week streak. Trophies have their own page.
+- Share a match as an image (default artwork or your own photo, which never leaves the device).
 
 ## Deployment (free)
 

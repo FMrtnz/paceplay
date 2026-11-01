@@ -1,5 +1,6 @@
 import { LEVELS, VARIATION_STEP_S } from './constants';
 import type { Kind, Level } from './constants';
+import { MESSAGES } from './vocabulary';
 
 export interface Phase { kind: Kind; dur: number }
 export interface Plan { phases: Phase[]; total: number; distKm: number; sig: string; seed: number; n: number }
@@ -28,11 +29,11 @@ function templateStep(tpl: number, i: number, n: number): number {
 }
 
 export function buildPlan(T: number, level: Level, seed = 0): Plan {
-  if (!Number.isInteger(T) || T < 600) throw new Error('Durée minimale : 10 minutes');
+  if (!Number.isInteger(T) || T < 600) throw new Error(MESSAGES.minDuration);
   const p = LEVELS[level], K = p.A + p.R;
   const W = clamp(round30(0.15 * T), 180, 300), C = clamp(round30(0.10 * T), 120, 300);
   const M = T - W - C, n = Math.floor(M / K), L = M - n * K;
-  if (n < 1) throw new Error('Séance trop courte pour ce niveau');
+  if (n < 1) throw new Error(MESSAGES.tooShort);
 
   const r = rng(seed), tpl = Math.floor(r() * 4), s = r() < 0.5 ? 1 : -1;
   const v = Array.from({ length: n }, (_, i) => s * templateStep(tpl, i, n));
@@ -48,13 +49,13 @@ export function buildPlan(T: number, level: Level, seed = 0): Plan {
   phases.push({ kind: 'cooldown', dur: C + L });
 
   const total = phases.reduce((a, x) => a + x.dur, 0);
-  if (total !== T) throw new Error('Invariant violé : somme des phases ≠ durée');
+  if (total !== T) throw new Error(MESSAGES.invariant);
   const distKm = phases.reduce((a, x) => a + x.dur * (x.kind === 'accel' ? p.vA : p.vE), 0) / 3600;
   return { phases, total, distKm, n, seed, sig: phases.map((x) => x.kind[0] + x.dur).join('-') };
 }
 
 export function durationForDistance(km: number, level: Level): number {
-  if (km < 1) throw new Error('Distance minimale : 1 km');
+  if (km < 1) throw new Error(MESSAGES.minDistance);
   const p = LEVELS[level], f = p.A / (p.A + p.R), v = (1 - f) * p.vE + f * p.vA;
   return Math.max(600, Math.ceil(km * 3600 / v / 60) * 60);
 }

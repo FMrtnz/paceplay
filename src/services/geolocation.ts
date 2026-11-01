@@ -1,9 +1,10 @@
 import type { Fix } from '../models/trackerModel';
+import { MESSAGES } from '../models/vocabulary';
 
 /** Browser GPS subscription. Returns the function that stops it. */
 export function watchGps(onFix: (f: Fix) => void, onMsg: (m: string) => void): () => void {
   if (!('geolocation' in navigator)) {
-    onMsg('GPS indisponible : mode durée uniquement.');
+    onMsg(MESSAGES.gpsUnavailable);
     return () => {};
   }
   const id = navigator.geolocation.watchPosition(
@@ -12,9 +13,9 @@ export function watchGps(onFix: (f: Fix) => void, onMsg: (m: string) => void): (
       onFix({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp });
     },
     (e) => onMsg(
-      e.code === 1 ? 'Localisation refusée : mode durée uniquement (aucune pénalité).'
-      : e.code === 2 ? 'Signal GPS perdu…'
-      : 'GPS trop lent à répondre…'),
+      e.code === 1 ? MESSAGES.gpsDenied
+      : e.code === 2 ? MESSAGES.gpsLost
+      : MESSAGES.gpsSlow),
     { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
   return () => navigator.geolocation.clearWatch(id);
 }

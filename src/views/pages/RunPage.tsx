@@ -1,6 +1,6 @@
-import { PHASE_LABEL, PHASE_TIP } from '../../models/constants';
+import { PHASE_LABEL, PHASE_TIP, SCREEN_TITLE } from '../../models/vocabulary';
 import type { RunView } from '../../controllers/useRunController';
-import { formatClock, formatKm } from '../../utils/format';
+import { formatClock, formatKm, formatPace } from '../../utils/format';
 import Snitch from '../components/Snitch';
 
 /** Live session screen. Everything shown comes from the run controller. */
@@ -8,6 +8,7 @@ export default function RunPage({ run }: { run: RunView }) {
   const { phaseKind } = run;
   return (
     <div className="w">
+      <div className="eyebrow">{SCREEN_TITLE.run}</div>
       <div className="card">
         <Snitch P={run.progress} />
         <div className="bar"><i style={{ width: `${run.progress * 100}%` }} /></div>
@@ -26,6 +27,8 @@ export default function RunPage({ run }: { run: RunView }) {
         <br />
         Distance: {formatKm(run.distM)} km {run.goalKm !== null ? `/ ${run.goalKm} km` : ''}{' '}
         <span className="muted">({run.sourceLabel} · reliability {run.quality})</span>
+        <br />
+        Pace: <b>{formatPace(run.paceNowMinKm)}</b> /km · avg {formatPace(run.paceAvgMinKm)} /km
         {run.gpsNotice && <div style={{ color: '#ffb86b' }}>{run.gpsNotice}</div>}
       </div>
 

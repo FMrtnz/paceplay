@@ -1,5 +1,5 @@
 import type { Phase } from '../../models/planModel';
-import { PHASE_LABEL } from '../../models/constants';
+import { PHASE_LABEL } from '../../models/vocabulary';
 import { formatClock } from '../../utils/format';
 
 /** Scrollable list of the phases of a plan. */

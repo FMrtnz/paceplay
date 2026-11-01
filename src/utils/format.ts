@@ -9,3 +9,21 @@ export const formatKm = (meters: number, digits = 2): string => (meters / 1000).
 
 /** Timestamp → date in the user's locale. */
 export const formatDate = (timestamp: number): string => new Date(timestamp).toLocaleDateString();
+
+/** Timestamp → short date like "Oct 26". */
+export const formatShortDate = (timestamp: number): string =>
+  new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+/** Pace in min/km → "m:ss", or "—" when unknown or absurd. */
+export const formatPace = (minPerKm: number | null): string => {
+  if (minPerKm === null || !isFinite(minPerKm)) return '—';
+  const total = Math.round(minPerKm * 60);
+  return total >= 6000 ? '—' : `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+};
+
+/** Pace as it is read aloud, e.g. "5 minutes 42 seconds". */
+export const spokenPace = (minPerKm: number): string => {
+  const total = Math.round(minPerKm * 60), m = Math.floor(total / 60), s = total % 60;
+  const part = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+  return s ? `${part(m, 'minute')} ${part(s, 'second')}` : part(m, 'minute');
+};

@@ -1,4 +1,5 @@
-import { LEVELS, SLIDER, STEPS_UNAVAILABLE_REASON } from '../../models/constants';
+import { LEVELS, SLIDER } from '../../models/constants';
+import { LEVEL_LABEL, MESSAGES, SCREEN_TITLE } from '../../models/vocabulary';
 import type { Level } from '../../models/constants';
 import type { RunConfig } from '../../models/sessionModel';
 import ChoiceGroup from '../components/ChoiceGroup';
@@ -19,6 +20,7 @@ export default function ConfigPage(props: {
 
   return (
     <>
+      <div className="eyebrow">{SCREEN_TITLE.config}</div>
       <h3>Goal</h3>
       <ChoiceGroup
         value={config.mode}
@@ -43,14 +45,14 @@ export default function ConfigPage(props: {
       <ChoiceGroup
         value={config.level}
         options={Object.keys(LEVELS) as Level[]}
-        label={(l) => LEVELS[l].label}
+        label={(l) => LEVEL_LABEL[l]}
         onChange={props.onLevelChange}
       />
 
       <div className="card muted">
         GPS: requested only during the session (distance is measured, reliability is shown).
         <br />
-        Steps: unavailable — {STEPS_UNAVAILABLE_REASON}
+        Steps: unavailable — {MESSAGES.stepsUnavailable}
         <br />
         Fallback: duration mode.
       </div>
@@ -72,7 +74,7 @@ export default function ConfigPage(props: {
       </label>
       <br />
       <br />
-      <button className="big" onClick={props.onGenerate}>Generate session</button>
+      <button className="big" onClick={props.onGenerate}>Generate game plan</button>
       <button onClick={props.onBack}>Back</button>
     </>
   );

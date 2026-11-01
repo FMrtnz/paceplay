@@ -1,5 +1,6 @@
-import { HISTORY_PREVIEW_COUNT, RECENT_SIGNATURES_COUNT, WEEK_MS } from './constants';
+import { RECENT_SIGNATURES_COUNT, WEEK_MS } from './constants';
 import type { Level } from './constants';
+import type { RunDetail } from './detailModel';
 import type { Plan } from './planModel';
 import { computeXp, earnedBadges } from './rewardModel';
 import type { RunConfig, RunOutcome } from './sessionModel';
@@ -19,6 +20,7 @@ export interface RunResult {
   xp: number;
   sig: string;
   P: number; // progress reached (0..1)
+  detail?: RunDetail; // absent on matches recorded before pace tracking
 }
 
 /** Everything the player has accumulated. */
@@ -46,10 +48,6 @@ export function normalizeProgress(raw: unknown): Progress {
 export const recentSignatures = (history: RunResult[], count = RECENT_SIGNATURES_COUNT): string[] =>
   history.slice(-count).map((r) => r.sig);
 
-/** Most recent sessions first. */
-export const latestHistory = (history: RunResult[], count = HISTORY_PREVIEW_COUNT): RunResult[] =>
-  [...history].reverse().slice(0, count);
-
 /** Completed sessions during the 7 days before `now`. */
 export const completedThisWeek = (history: RunResult[], now: number): number =>
   history.filter((r) => r.completed && now - r.date < WEEK_MS).length;
@@ -67,9 +65,20 @@ export function applyRun(progress: Progress, outcome: RunOutcome, config: RunCon
     date: now, mode: config.mode, level: config.level, completed: outcome.completed,
     elapsed: outcome.elapsed, distM: outcome.distM, source: outcome.source, challenges: outcome.challenges,
     xp, sig: plan.sig, P: outcome.progress,
+    ...(outcome.detail ? { detail: outcome.detail } : {}),
   };
   const history = [...progress.history, result];
   const badges = earnedBadges(history, week3 || progress.badges.includes('w3'));
   const next: Progress = { ...progress, xp: progress.xp + xp, history, badges, seed: plan.seed + 1, level: config.level };
   return { next, result, newBadges: badges.filter((b) => !progress.badges.includes(b)) };
+}
+
+/**
+ * Removes one session (identified by its date) and the XP it gave.
+ * Badges are kept: once earned they are never revoked.
+ */
+export function removeRun(progress: Progress, date: number): Progress {
+  const run = progress.history.find((r) => r.date === date);
+  if (!run) return progress;
+  return { ...progress, xp: Math.max(0, progress.xp - run.xp), history: progress.history.filter((r) => r !== run) };
 }

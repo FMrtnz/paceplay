@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { CAPTURE_VIBRATION, SIGNAL_LOST_MESSAGE, SIGNAL_LOST_MS, TICK_MS } from '../models/constants';
+import { CAPTURE_VIBRATION, SIGNAL_LOST_MS, TICK_MS } from '../models/constants';
 import type { Kind } from '../models/constants';
+import { buildDetail, emptyLog, phasePaceMinKm, updateLog } from '../models/detailModel';
+import type { RunLog } from '../models/detailModel';
+import { averagePaceMinKm } from '../models/paceModel';
 import type { Plan } from '../models/planModel';
 import {
   computeProgress, countCompletedAccelerations, createClock, elapsedS, goalDistanceM, isGoalReached, locate, pause, resume,
@@ -9,9 +12,9 @@ import type { Clock, RunConfig, RunOutcome } from '../models/sessionModel';
 import { clearActiveSession, loadActiveSession, saveActiveSession } from '../models/storage';
 import { Tracker } from '../models/trackerModel';
 import type { Fix } from '../models/trackerModel';
+import { MESSAGES } from '../models/vocabulary';
 import { announcePhase, beep, unlockAudio, vibrate } from '../services/feedback';
-import { watchGps } from '../services/geolocation';
-import { keepScreenOn } from '../services/wakeLock';
+import { useRunSensors } from './useRunSensors';
 
 /** Everything the run page displays, plus its two actions. */
 export interface RunView {
@@ -22,6 +25,8 @@ export interface RunView {
   distM: number;
   goalKm: number | null;
   metersToGo: number | null;
+  paceNowMinKm: number | null; // smoothed over ~25 s
+  paceAvgMinKm: number | null;
   progress: number;
   paused: boolean;
   sourceLabel: 'simulation' | 'GPS';
@@ -31,15 +36,18 @@ export interface RunView {
   endEarly: () => void;
 }
 
-/** Runs one session: clock, GPS/simulation, autosave, end detection, sound and voice cues. */
+/** Runs one session: clock, GPS/simulation, recording, autosave, end detection, sound and voice cues. */
 export function useRunController(props: { plan: Plan; config: RunConfig; soundEnabled: boolean; onEnd: (o: RunOutcome) => void }): RunView {
   const { plan, config, soundEnabled: sound, onEnd } = props;
   // Resume after a reload: read back the saved session (once)
   const [saved] = useState(loadActiveSession);
+  const tracked = !saved || !!saved.log; // sessions saved before pace tracking cannot be recorded
   const clock = useRef<Clock>(saved?.clock ?? createClock(Date.now()));
   const tracker = useRef(new Tracker(saved?.dist ?? 0));
+  const log = useRef<RunLog>(saved?.log ?? emptyLog(plan));
   const lastFixAt = useRef(Date.now());
   const finished = useRef(false);
+  const firstCue = useRef(true);
   const [, refresh] = useState(0);
   const [gpsMessage, setGpsMessage] = useState('');
 
@@ -70,6 +78,7 @@ export function useRunController(props: { plan: Plan; config: RunConfig; soundEn
       challenges: countCompletedAccelerations(plan, elapsed),
       progress,
       source: sourceLabel,
+      detail: tracked ? buildDetail(plan, log.current, elapsed, distM) : undefined,
     });
   }
 
@@ -80,41 +89,35 @@ export function useRunController(props: { plan: Plan; config: RunConfig; soundEn
     refresh((x) => x + 1);
   }
 
-  // Display loop + saving + end-of-run check.
+  // Display loop + recording + saving + end-of-run check.
   // No dependency list on purpose: it is re-created at every render so `endRun` sees fresh values.
   useEffect(() => {
     const id = setInterval(() => {
       refresh((x) => x + 1);
-      saveActiveSession({ plan, cfg: config, clock: clock.current, dist: tracker.current.dist });
       const t = elapsedS(clock.current, Date.now());
+      if (tracked) log.current = updateLog(log.current, plan, t, tracker.current.dist);
+      saveActiveSession({
+        plan, cfg: config, clock: clock.current, dist: tracker.current.dist, log: tracked ? log.current : undefined,
+      });
       if (isGoalReached(plan, t, tracker.current.dist, targetM)) endRun(true);
     }, TICK_MS);
     return () => clearInterval(id);
   });
 
-  // Position source: real GPS or simulation
-  useEffect(() => {
-    const onFix = (f: Fix) => {
-      if (clock.current.pausedAt) return;
-      lastFixAt.current = Date.now();
-      tracker.current.add(f);
-    };
-    if (!config.sim) return watchGps(onFix, setGpsMessage);
-    // The simulator is test-only code: load it on demand (the first simulated fix comes after 1 s)
-    let stop = () => {};
-    let cancelled = false;
-    import('../services/simulator').then((m) => { if (!cancelled) stop = m.simulate(onFix); });
-    return () => { cancelled = true; stop(); };
-  }, []);
+  useRunSensors(config.sim, (f: Fix) => {
+    if (clock.current.pausedAt) return;
+    lastFixAt.current = Date.now();
+    tracker.current.add(f);
+  }, setGpsMessage);
 
-  // Keep the screen on when the browser allows it
-  useEffect(() => keepScreenOn(), []);
-
-  // Sound + voice prompt at each phase change
+  // Sound + voice prompt at each phase change; after a speed-up, the pace that was held
   useEffect(() => {
     if (!phase) return;
     beep(phase.kind === 'accel' ? 'up' : 'down', sound);
-    announcePhase(phase.kind);
+    const i = position.i;
+    const afterSpeedUp = tracked && !firstCue.current && i > 0 && plan.phases[i - 1].kind === 'accel';
+    firstCue.current = false;
+    announcePhase(phase.kind, afterSpeedUp ? phasePaceMinKm(plan, log.current, i - 1) : null);
   }, [position.i]);
 
   return {
@@ -125,11 +128,13 @@ export function useRunController(props: { plan: Plan; config: RunConfig; soundEn
     distM,
     goalKm: targetM ? config.val : null,
     metersToGo: targetM ? Math.max(0, Math.round(targetM - distM)) : null,
+    paceNowMinKm: tracker.current.recentPaceMinKm(now),
+    paceAvgMinKm: averagePaceMinKm(elapsed, distM),
     progress,
     paused,
     sourceLabel,
     quality: tracker.current.quality(),
-    gpsNotice: gpsMessage || (signalLost ? SIGNAL_LOST_MESSAGE : ''),
+    gpsNotice: gpsMessage || (signalLost ? MESSAGES.signalLost : ''),
     togglePause,
     endEarly: () => endRun(false),
   };

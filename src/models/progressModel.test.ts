@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyRun, emptyProgress, latestHistory, normalizeProgress, recentSignatures } from './progressModel';
+import { applyRun, emptyProgress, normalizeProgress, recentSignatures, removeRun } from './progressModel';
 import type { RunResult } from './progressModel';
 import type { Plan } from './planModel';
 import type { RunConfig, RunOutcome } from './sessionModel';
@@ -63,11 +63,26 @@ describe('applyRun', () => {
 });
 
 describe('history selectors', () => {
-  it('keeps the last N signatures and lists latest runs first', () => {
+  it('keeps the last N signatures', () => {
     const h = Array.from({ length: 30 }, (_, i) => past(30 - i));
     expect(recentSignatures(h)).toHaveLength(20);
     expect(recentSignatures(h)[19]).toBe(h[29].sig);
-    expect(latestHistory(h)).toHaveLength(15);
-    expect(latestHistory(h)[0]).toBe(h[29]);
+  });
+});
+
+describe('removeRun', () => {
+  const runs = [{ ...past(3), xp: 40 }, { ...past(2), xp: 25 }, { ...past(1), xp: 10 }];
+  const base = { ...emptyProgress(), xp: 75, history: runs, badges: ['first'] };
+  it('removes the session and its XP, keeps the other sessions and the badges', () => {
+    const r = removeRun(base, runs[1].date);
+    expect(r.history).toEqual([runs[0], runs[2]]);
+    expect(r.xp).toBe(50);
+    expect(r.badges).toEqual(['first']);
+  });
+  it('ignores an unknown date', () => {
+    expect(removeRun(base, 123)).toBe(base);
+  });
+  it('never makes XP negative', () => {
+    expect(removeRun({ ...base, xp: 5 }, runs[0].date).xp).toBe(0);
   });
 });

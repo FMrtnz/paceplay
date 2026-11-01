@@ -1,3 +1,5 @@
+import { PACE_STALE_MS, PACE_WINDOW_MS } from './constants';
+
 export interface Fix { lat: number; lon: number; acc: number; t: number }
 
 /** Great-circle distance in meters between two fixes. */
@@ -14,6 +16,7 @@ export class Tracker {
   rejected = 0;
   accSum = 0;
   n = 0;
+  private samples: { t: number; d: number }[] = []; // (time, distance) after each accepted fix
 
   constructor(public dist = 0) {}
 
@@ -33,13 +36,29 @@ export class Tracker {
     return d;
   }
 
-  private note(f: Fix) { this.accSum += f.acc; this.n++; }
-
-  quality(): 'bonne' | 'moyenne' | 'faible' | '—' {
-    if (!this.n) return '—';
-    const a = this.accSum / this.n;
-    return a <= 10 ? 'bonne' : a <= 20 ? 'moyenne' : 'faible';
+  private note(f: Fix) {
+    this.accSum += f.acc;
+    this.n++;
+    this.samples.push({ t: f.t, d: this.dist });
+    if (this.samples.length > 60) this.samples.shift(); // enough for any window at 1 fix/s
   }
 
-  paceMinKm() { return this.speed > 0.3 ? 1000 / this.speed / 60 : null; }
+  quality(): 'good' | 'fair' | 'poor' | '—' {
+    if (!this.n) return '—';
+    const a = this.accSum / this.n;
+    return a <= 10 ? 'good' : a <= 20 ? 'fair' : 'poor';
+  }
+
+  /** Pace in min/km over the last ~25 s, or null when stopped, stale or not enough data. */
+  recentPaceMinKm(now: number): number | null {
+    const s = this.samples;
+    if (s.length < 2) return null;
+    const last = s[s.length - 1];
+    if (now - last.t > PACE_STALE_MS) return null;
+    let i = s.length - 1;
+    while (i > 0 && last.t - s[i - 1].t <= PACE_WINDOW_MS) i--;
+    const seconds = (last.t - s[i].t) / 1000, meters = last.d - s[i].d;
+    if (seconds < 5 || meters < 5) return null;
+    return seconds / 60 / (meters / 1000);
+  }
 }
