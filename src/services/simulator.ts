@@ -1,4 +1,4 @@
-import type{Fix}from'./gps';
+import type { Fix } from '../models/trackerModel';
 /** Simulated run at ~2.8 m/s; a fake 500 m jump every 37 s to test the filter. */
 export function simulate(onFix:(f:Fix)=>void):()=>void{
   let lat=48.85,k=0;
