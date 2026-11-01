@@ -1,0 +1,1 @@
+function e(e){let t=48.85,n=0,r=setInterval(()=>{n++,t+=2.8/111320;let r=n%37==0?500/111320:0;e({lat:t+r,lon:2.35,acc:6,t:Date.now()})},1e3);return()=>clearInterval(r)}export{e as simulate};
