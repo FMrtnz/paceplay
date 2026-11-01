@@ -4,7 +4,7 @@ import type { RunResult } from './progressModel';
 
 const at = (d: number) => new Date(2026, 9, d, 12).getTime();
 const run = (date: number, over: Partial<RunResult>): RunResult => ({
-  date, mode: 'time', level: 'beginner', completed: true, elapsed: 1800, distM: 4000, source: 'GPS', challenges: 4, xp: 50, sig: 's' + date, P: 1, ...over,
+  date, mode: 'time', level: 'beginner', activity: 'run', format: 'intervals', completed: true, elapsed: 1800, distM: 4000, source: 'GPS', challenges: 4, xp: 50, sig: 's' + date, P: 1, ...over,
 });
 
 describe('records', () => {

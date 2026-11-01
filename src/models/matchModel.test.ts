@@ -3,7 +3,7 @@ import { describeMatch } from './matchModel';
 import { buildShareCard } from './shareCardModel';
 import type { RunResult } from './progressModel';
 
-const base: RunResult = { date: 1_700_000_000_000, mode: 'time', level: 'intermediate', completed: true, elapsed: 1500, distM: 5000, source: 'GPS', challenges: 5, xp: 120, sig: 's', P: 1 };
+const base: RunResult = { date: 1_700_000_000_000, mode: 'time', level: 'intermediate', activity: 'run', format: 'intervals', completed: true, elapsed: 1500, distM: 5000, source: 'GPS', challenges: 5, xp: 120, sig: 's', P: 1 };
 const detailed: RunResult = {
   ...base,
   detail: {

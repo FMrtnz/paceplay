@@ -17,7 +17,7 @@ export default function PreviewPage(props: {
     <>
       <div className="eyebrow">{SCREEN_TITLE.preview}</div>
       <div className="card">
-        Duration {formatClock(plan.total)} · {plan.n} speed-ups · ≈ {plan.distKm.toFixed(2)} km (estimate)
+        Duration {formatClock(plan.total)} · {config.format === 'steady' ? 'Steady effort' : `${plan.n} speed-ups`} · ≈ {plan.distKm.toFixed(2)} km (estimate)
         {config.mode === 'dist' && <><br />Goal: {config.val} km measured by GPS</>}
         {props.repeated && (
           <div className="muted">All recent variants have been played: this game plan was already seen.</div>

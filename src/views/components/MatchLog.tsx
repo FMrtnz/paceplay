@@ -14,6 +14,8 @@ export default function MatchLog({ groups, onOpen, onDelete }: { groups: MonthGr
               <button className="row-open" onClick={() => onOpen(r.date)} aria-label={`Open match of ${formatDate(r.date)}`}>
                 {formatDate(r.date)} · {formatClock(r.elapsed)} · {formatKm(r.distM, 1)} km · +{r.xp} XP{' '}
                 {r.completed ? '✓' : '(interrupted)'}
+                {r.activity === 'bike' && <span className="tag">Bike</span>}
+                {r.format === 'steady' && <span className="tag">Steady</span>}
               </button>
               <button className="row-delete" aria-label="Delete this match" onClick={() => onDelete(r.date)}>Delete</button>
             </div>

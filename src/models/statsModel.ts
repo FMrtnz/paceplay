@@ -1,13 +1,19 @@
 import { averagePaceMinKm } from './paceModel';
 import type { RunResult } from './progressModel';
 
+import type { Activity } from './constants';
+
 export interface WeekStat { weekStart: number; distM: number; matches: number; paceMinKm: number | null }
 export interface DayCell { date: number; distM: number; level: 0 | 1 | 2 | 3 | 4; future: boolean }
 export interface MonthGroup { key: string; label: string; distM: number; runs: RunResult[] }
 
-/** Heatmap intensity of a day: 0 = rest day, 4 = 10 km or more. */
-const heatLevel = (distM: number): DayCell['level'] =>
-  distM <= 0 ? 0 : distM < 3000 ? 1 : distM < 6000 ? 2 : distM < 10000 ? 3 : 4;
+/** Heatmap thresholds in km (levels 1 to 3; 4 above): a bike ride is longer than a run. */
+const HEAT_KM: Record<Activity, [number, number, number]> = { run: [3, 6, 10], bike: [10, 25, 50] };
+/** Heatmap intensity of a day: 0 = rest day, 4 = the longest bracket. */
+const heatLevel = (distM: number, activity: Activity): DayCell['level'] => {
+  const [a, b, c] = HEAT_KM[activity].map((km) => km * 1000);
+  return distM <= 0 ? 0 : distM < a ? 1 : distM < b ? 2 : distM < c ? 3 : 4;
+};
 
 const addDays = (ts: number, n: number) => { const d = new Date(ts); d.setDate(d.getDate() + n); return d.getTime(); };
 export const startOfDay = (ts: number) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -36,7 +42,7 @@ export function weeklyTotals(history: RunResult[], now: number, weeks = 12): Wee
 }
 
 /** Calendar heatmap: `weeks` columns (oldest first) of 7 days (Monday → Sunday). */
-export function calendarGrid(history: RunResult[], now: number, weeks = 16): DayCell[][] {
+export function calendarGrid(history: RunResult[], now: number, weeks = 16, activity: Activity = 'run'): DayCell[][] {
   const perDay = new Map<number, number>();
   for (const r of history) perDay.set(startOfDay(r.date), (perDay.get(startOfDay(r.date)) ?? 0) + r.distM);
   const first = addDays(startOfWeek(now), -7 * (weeks - 1));
@@ -44,7 +50,7 @@ export function calendarGrid(history: RunResult[], now: number, weeks = 16): Day
     Array.from({ length: 7 }, (_, d) => {
       const date = addDays(first, w * 7 + d);
       const distM = perDay.get(date) ?? 0;
-      return { date, distM, level: heatLevel(distM), future: date > now };
+      return { date, distM, level: heatLevel(distM, activity), future: date > now };
     }));
 }
 

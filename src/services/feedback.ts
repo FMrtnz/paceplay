@@ -1,5 +1,4 @@
 import { PHASE_LABEL, PHASE_TIP } from '../models/vocabulary';
-import { spokenPace } from '../utils/format';
 import type { Kind } from '../models/constants';
 
 /** Sounds (Web Audio), vibration and voice. Vibration does not exist on Safari iOS: silently ignored.
@@ -39,14 +38,11 @@ export function vibrate(pattern: number | number[], enabled: boolean) {
   try { if (enabled) navigator.vibrate?.(pattern); } catch {}
 }
 
-/** Spoken prompt for a new phase. After a speed-up, it first reads the pace that was held.
- *  Not gated by the sound preference (as before). */
-export function announcePhase(kind: Kind, finishedSpeedUpPace: number | null = null) {
+/** Spoken prompt for a new phase, optionally preceded by the result of the previous one
+ *  (e.g. the pace held during a speed-up). Not gated by the sound preference (as before). */
+export function announcePhase(kind: Kind, previousResult: string | null = null) {
   try {
-    const result = finishedSpeedUpPace === null
-      ? ''
-      : `${PHASE_LABEL.accel} complete. ${spokenPace(finishedSpeedUpPace)} per kilometre. `;
-    const say = new SpeechSynthesisUtterance(`${result}${PHASE_LABEL[kind]}. ${PHASE_TIP[kind]}`);
+    const say = new SpeechSynthesisUtterance(`${previousResult ? previousResult + ' ' : ''}${PHASE_LABEL[kind]}. ${PHASE_TIP[kind]}`);
     say.lang = 'en-US';
     speechSynthesis.speak(say);
   } catch {}

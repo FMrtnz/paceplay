@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { CAPTURE_VIBRATION, SIGNAL_LOST_MS, TICK_MS } from '../models/constants';
-import type { Kind } from '../models/constants';
+import { CAPTURE_VIBRATION, MAX_SPEED_MS, SIGNAL_LOST_MS, TICK_MS } from '../models/constants';
+import type { Activity, Kind } from '../models/constants';
 import { buildDetail, emptyLog, phasePaceMinKm, updateLog } from '../models/detailModel';
 import type { RunLog } from '../models/detailModel';
 import { averagePaceMinKm } from '../models/paceModel';
@@ -12,12 +12,14 @@ import type { Clock, RunConfig, RunOutcome } from '../models/sessionModel';
 import { clearActiveSession, loadActiveSession, saveActiveSession } from '../models/storage';
 import { Tracker } from '../models/trackerModel';
 import type { Fix } from '../models/trackerModel';
-import { MESSAGES } from '../models/vocabulary';
+import { MESSAGES, PHASE_LABEL } from '../models/vocabulary';
+import { spokenEffort } from '../utils/format';
 import { announcePhase, beep, unlockAudio, vibrate } from '../services/feedback';
 import { useRunSensors } from './useRunSensors';
 
 /** Everything the run page displays, plus its two actions. */
 export interface RunView {
+  activity: Activity; // a run is shown as a pace, a ride as a speed
   phaseKind: Kind | null; // null once the plan is over but a distance goal is still open
   phaseTimeLeft: number;
   elapsed: number;
@@ -43,7 +45,7 @@ export function useRunController(props: { plan: Plan; config: RunConfig; soundEn
   const [saved] = useState(loadActiveSession);
   const tracked = !saved || !!saved.log; // sessions saved before pace tracking cannot be recorded
   const clock = useRef<Clock>(saved?.clock ?? createClock(Date.now()));
-  const tracker = useRef(new Tracker(saved?.dist ?? 0));
+  const tracker = useRef(new Tracker(saved?.dist ?? 0, MAX_SPEED_MS[config.activity]));
   const log = useRef<RunLog>(saved?.log ?? emptyLog(plan));
   const lastFixAt = useRef(Date.now());
   const finished = useRef(false);
@@ -104,7 +106,7 @@ export function useRunController(props: { plan: Plan; config: RunConfig; soundEn
     return () => clearInterval(id);
   });
 
-  useRunSensors(config.sim, (f: Fix) => {
+  useRunSensors(config, (f: Fix) => {
     if (clock.current.pausedAt) return;
     lastFixAt.current = Date.now();
     tracker.current.add(f);
@@ -113,14 +115,16 @@ export function useRunController(props: { plan: Plan; config: RunConfig; soundEn
   // Sound + voice prompt at each phase change; after a speed-up, the pace that was held
   useEffect(() => {
     if (!phase) return;
-    beep(phase.kind === 'accel' ? 'up' : 'down', sound);
+    beep(phase.kind === 'accel' || phase.kind === 'steady' ? 'up' : 'down', sound);
     const i = position.i;
     const afterSpeedUp = tracked && !firstCue.current && i > 0 && plan.phases[i - 1].kind === 'accel';
     firstCue.current = false;
-    announcePhase(phase.kind, afterSpeedUp ? phasePaceMinKm(plan, log.current, i - 1) : null);
+    const held = afterSpeedUp ? phasePaceMinKm(plan, log.current, i - 1) : null;
+    announcePhase(phase.kind, held === null ? null : `${PHASE_LABEL.accel} complete. ${spokenEffort(held, config.activity)}.`);
   }, [position.i]);
 
   return {
+    activity: config.activity,
     phaseKind: phase ? phase.kind : null,
     phaseTimeLeft: position.left,
     elapsed,

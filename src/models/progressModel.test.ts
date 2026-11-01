@@ -17,6 +17,10 @@ describe('normalizeProgress (legacy migration)', () => {
     expect(p.history.map((r) => r.level)).toEqual(['beginner', 'advanced', 'beginner']);
     expect(p.history.map((r) => r.challenges)).toEqual([4, 2, 0]);
   });
+  it('matches saved before the bike and steady modes become run + intervals', () => {
+    const p = normalizeProgress({ history: [{ level: 'beginner' }, { activity: 'bike', format: 'steady' }] });
+    expect(p.history.map((r) => [r.activity, r.format])).toEqual([['run', 'intervals'], ['bike', 'steady']]);
+  });
   it('throws on a malformed history (storage then falls back to empty)', () => {
     expect(() => normalizeProgress({ history: 'oops' })).toThrow();
   });
@@ -24,11 +28,11 @@ describe('normalizeProgress (legacy migration)', () => {
 
 const DAY = 864e5, NOW = 1_700_000_000_000;
 const plan = { sig: 'w180-a30', seed: 4 } as Plan;
-const config: RunConfig = { mode: 'time', val: 20, level: 'intermediate', sim: false };
+const config: RunConfig = { mode: 'time', val: 20, level: 'intermediate', sim: false, activity: 'run', format: 'intervals', warmupMin: null };
 const outcome = (o: Partial<RunOutcome> = {}): RunOutcome =>
   ({ completed: true, elapsed: 1200, distM: 3000, challenges: 7, progress: 1, source: 'GPS', ...o });
 const past = (daysAgo: number, completed = true): RunResult => ({
-  date: NOW - daysAgo * DAY, mode: 'time', level: 'beginner', completed, elapsed: 600, distM: 0,
+  date: NOW - daysAgo * DAY, mode: 'time', level: 'beginner', activity: 'run', format: 'intervals', completed, elapsed: 600, distM: 0,
   source: 'GPS', challenges: 0, xp: 0, sig: 's' + daysAgo, P: 1,
 });
 
@@ -42,6 +46,12 @@ describe('applyRun', () => {
     expect(r.next.level).toBe('intermediate');
     expect(r.result.P).toBe(1);
     expect(r.next.history).toHaveLength(1);
+  });
+  it('the result remembers the activity and format; XP rules are the same for a ride', () => {
+    const bike = applyRun(emptyProgress(), outcome(), { ...config, activity: 'bike', format: 'steady' }, plan, NOW);
+    const run = applyRun(emptyProgress(), outcome(), config, plan, NOW);
+    expect([bike.result.activity, bike.result.format]).toEqual(['bike', 'steady']);
+    expect(bike.result.xp).toBe(run.result.xp);
   });
   it('interrupted run still earns a share of XP, no badge', () => {
     const r = applyRun(emptyProgress(), outcome({ completed: false, progress: 0.5, challenges: 2 }), config, plan, NOW);

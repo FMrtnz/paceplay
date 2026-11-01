@@ -56,10 +56,15 @@ Rules of thumb:
   must never be renamed without a migration in `progressModel.normalizeProgress`.
 - `useRunController`'s interval effect has no dependency list on purpose: it is re-created on
   every render so the end-of-run handler always sees fresh values.
-- Matches saved before pace tracking have no `detail`: every screen must keep working without it.
+- Matches saved before pace tracking have no `detail`, and matches/sessions saved before the bike and steady modes
+  have no `activity` / `format` / `warmupMin`: `normalizeProgress` and `storage.loadActiveSession` fill in
+  run / intervals / auto. Every screen must keep working without `detail`.
 
 ## Features
 
+- Two activities: **Run** (shown as a pace, min/km) and **Bike** (shown as a speed, km/h), each with its own goal ranges, GPS speed limit and records.
+- Two formats: **Intervals** (speed-ups and recoveries) and **Steady** (one continuous, even effort).
+- Configurable **warm-up**: Auto, None, 3, 5, 10 or 15 min.
 - Live pace (current, smoothed over ~25 s, and average) and a spoken pace after each speed-up.
 - Every match keeps its pace per kilometre and per phase (GPS only; paces over less than a minute are marked ≈).
 - Progress: matches by month, records, weekly trends, calendar heatmap and week streak. Trophies have their own page.

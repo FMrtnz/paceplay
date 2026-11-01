@@ -1,6 +1,6 @@
-import { PHASE_LABEL, PHASE_TIP, SCREEN_TITLE } from '../../models/vocabulary';
+import { EFFORT_LABEL, PHASE_LABEL, PHASE_TIP, SCREEN_TITLE } from '../../models/vocabulary';
 import type { RunView } from '../../controllers/useRunController';
-import { formatClock, formatKm, formatPace } from '../../utils/format';
+import { formatClock, formatEffort, formatKm } from '../../utils/format';
 import Snitch from '../components/Snitch';
 
 /** Live session screen. Everything shown comes from the run controller. */
@@ -28,7 +28,7 @@ export default function RunPage({ run }: { run: RunView }) {
         Distance: {formatKm(run.distM)} km {run.goalKm !== null ? `/ ${run.goalKm} km` : ''}{' '}
         <span className="muted">({run.sourceLabel} · reliability {run.quality})</span>
         <br />
-        Pace: <b>{formatPace(run.paceNowMinKm)}</b> /km · avg {formatPace(run.paceAvgMinKm)} /km
+        {EFFORT_LABEL[run.activity].now}: <b>{formatEffort(run.paceNowMinKm, run.activity)}</b> · avg {formatEffort(run.paceAvgMinKm, run.activity)}
         {run.gpsNotice && <div style={{ color: '#ffb86b' }}>{run.gpsNotice}</div>}
       </div>
 

@@ -1,9 +1,18 @@
-import type { Level } from './constants';
+import type { Activity, Format, Level } from './constants';
 import type { RunDetail, RunLog } from './detailModel';
-import type { Plan } from './planModel';
+import type { Plan, PlanOptions } from './planModel';
 
 export interface Clock { startedAt: number; pausedMs: number; pausedAt: number | null }
-export interface RunConfig { mode: 'time' | 'dist'; val: number; level: Level; sim: boolean }
+/** `activity`, `format` and `warmupMin` are absent in sessions saved by earlier versions (storage fills them in). */
+export interface RunConfig {
+  mode: 'time' | 'dist'; val: number; level: Level; sim: boolean;
+  activity: Activity; format: Format; warmupMin: number | null; // warm-up minutes: null = automatic, 0 = none
+}
+
+/** Plan options chosen in the setup screen. */
+export const planOptions = (c: RunConfig): PlanOptions => ({
+  activity: c.activity, format: c.format, warmupS: c.warmupMin === null ? null : c.warmupMin * 60,
+});
 /** Session saved on every tick so it can resume after a page reload. */
 /** `log` is absent on sessions saved before detail recording existed. */
 export interface ActiveSession { plan: Plan; cfg: RunConfig; clock: Clock; dist: number; log?: RunLog }

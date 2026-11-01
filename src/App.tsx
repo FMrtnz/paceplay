@@ -48,6 +48,7 @@ export default function App() {
         <ConfigPage
           config={setup.config} soundEnabled={setup.soundEnabled}
           onModeChange={setup.setMode} onValueChange={setup.setValue} onLevelChange={setup.setLevel}
+          onActivityChange={setup.setActivity} onFormatChange={setup.setFormat} onWarmupChange={setup.setWarmup}
           onSimulationChange={setup.setSimulation} onSoundChange={setup.setSoundEnabled}
           onGenerate={() => alertIfFailed(app.generatePlan())} onBack={app.goHome}
         />
@@ -66,8 +67,7 @@ export default function App() {
       )}
       {app.screen === 'progress' && (
         <ProgressPage
-          xp={progress.summary.xp} monthGroups={progress.monthGroups} records={progress.records}
-          weekly={progress.weekly} calendar={progress.calendar} streak={progress.streak}
+          xp={progress.summary.xp} monthGroups={progress.monthGroups} stats={progress.statsByActivity} streak={progress.streak}
           onOpenMatch={app.openMatch} onDeleteMatch={(date) => { if (confirmDelete()) progress.deleteRun(date); }}
         />
       )}

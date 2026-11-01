@@ -27,3 +27,18 @@ export const spokenPace = (minPerKm: number): string => {
   const part = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
   return s ? `${part(m, 'minute')} ${part(s, 'second')}` : part(m, 'minute');
 };
+
+/** Pace (min/km) → speed in km/h, or null. */
+export const kmhFromPace = (minPerKm: number | null): number | null =>
+  minPerKm === null || !isFinite(minPerKm) || minPerKm <= 0 ? null : 60 / minPerKm;
+
+/** The effort of a run as a pace ("5:42 /km"), of a ride as a speed ("27.3 km/h"). */
+export const formatEffort = (minPerKm: number | null, activity: 'run' | 'bike'): string => {
+  if (activity === 'run') return `${formatPace(minPerKm)} /km`;
+  const kmh = kmhFromPace(minPerKm);
+  return kmh === null ? '— km/h' : `${kmh.toFixed(1)} km/h`;
+};
+
+/** Same, as it is read aloud. */
+export const spokenEffort = (minPerKm: number, activity: 'run' | 'bike'): string =>
+  activity === 'run' ? `${spokenPace(minPerKm)} per kilometre` : `${(60 / minPerKm).toFixed(1)} kilometres per hour`;

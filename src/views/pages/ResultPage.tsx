@@ -15,8 +15,7 @@ export default function ResultPage({ result, newBadges, onShare, onViewMatch, on
         <br />
         Distance {formatKm(result.distM)} km ({result.source})
         <br />
-        Speed-ups completed: {result.challenges}
-        <br />
+        {result.format === 'intervals' && <>Speed-ups completed: {result.challenges}<br /></>}
         <b>+{result.xp} XP</b>
       </div>
       {newBadges.map((b) => (

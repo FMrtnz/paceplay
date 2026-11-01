@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildPlan } from './planModel';
-import { computeProgress, countCompletedAccelerations, elapsedS, goalDistanceM, isGoalReached, locate, pause, resume } from './sessionModel';
+import { planOptions, computeProgress, countCompletedAccelerations, elapsedS, goalDistanceM, isGoalReached, locate, pause, resume } from './sessionModel';
 
 describe('clock', () => {
   it('pause/resume', () => {
@@ -11,6 +11,8 @@ describe('clock', () => {
     expect(elapsedS(c, 60000)).toBe(20);
   });
 });
+
+const CFG = { mode: 'time', val: 20, level: 'beginner', sim: false, activity: 'run', format: 'intervals', warmupMin: null } as const;
 
 describe('run helpers', () => {
   const plan = buildPlan(1200, 'beginner', 0); // acceleration lengths vary by ±15 s
@@ -27,8 +29,8 @@ describe('run helpers', () => {
     expect(computeProgress(2000, 1200, 0, 0)).toBe(1);
   });
   it('goal: distance target ends on distance, duration goal on time', () => {
-    expect(goalDistanceM({ mode: 'dist', val: 3, level: 'beginner', sim: false })).toBe(3000);
-    expect(goalDistanceM({ mode: 'time', val: 20, level: 'beginner', sim: false })).toBe(0);
+    expect(goalDistanceM({ ...CFG, mode: 'dist', val: 3 })).toBe(3000);
+    expect(goalDistanceM({ ...CFG, mode: 'time', val: 20 })).toBe(0);
     expect(isGoalReached(plan, 1199, 0, 0)).toBe(false);
     expect(isGoalReached(plan, 1200, 0, 0)).toBe(true);
     expect(isGoalReached(plan, 5000, 2999, 3000)).toBe(false);
@@ -37,5 +39,13 @@ describe('run helpers', () => {
   it('locate: phase index and time left', () => {
     expect(locate(plan, 10)).toEqual({ i: 0, left: plan.phases[0].dur - 10 });
     expect(locate(plan, 1200).i).toBe(plan.phases.length);
+  });
+});
+
+describe('planOptions', () => {
+  it('turns the setup choices into plan options (warm-up minutes → seconds)', () => {
+    expect(planOptions({ ...CFG, activity: 'bike', format: 'steady', warmupMin: 5 })).toEqual({ activity: 'bike', format: 'steady', warmupS: 300 });
+    expect(planOptions({ ...CFG, warmupMin: null }).warmupS).toBe(null);
+    expect(planOptions({ ...CFG, warmupMin: 0 }).warmupS).toBe(0);
   });
 });

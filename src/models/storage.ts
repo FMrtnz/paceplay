@@ -15,7 +15,11 @@ export function saveProgress(p: Progress) {
 }
 
 export function loadActiveSession(): ActiveSession | null {
-  try { return JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null'); } catch { return null; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null');
+    // Sessions saved before the bike and steady modes lack these fields
+    return saved && { ...saved, cfg: { activity: 'run', format: 'intervals', warmupMin: null, ...saved.cfg } };
+  } catch { return null; }
 }
 export function saveActiveSession(a: ActiveSession) {
   try { localStorage.setItem(ACTIVE_KEY, JSON.stringify(a)); } catch {}

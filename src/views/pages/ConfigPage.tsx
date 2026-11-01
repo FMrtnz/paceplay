@@ -1,26 +1,38 @@
-import { LEVELS, SLIDER } from '../../models/constants';
-import { LEVEL_LABEL, MESSAGES, SCREEN_TITLE } from '../../models/vocabulary';
-import type { Level } from '../../models/constants';
+import { LEVELS, SLIDER, WARMUP_CHOICES } from '../../models/constants';
+import type { Activity, Format, Level } from '../../models/constants';
 import type { RunConfig } from '../../models/sessionModel';
+import { ACTIVITY_LABEL, FORMAT_LABEL, LEVEL_LABEL, MESSAGES, SCREEN_TITLE, warmupLabel } from '../../models/vocabulary';
 import ChoiceGroup from '../components/ChoiceGroup';
 
-export default function ConfigPage(props: {
+interface Props {
   config: RunConfig;
   soundEnabled: boolean;
+  onActivityChange: (activity: Activity) => void;
   onModeChange: (mode: RunConfig['mode']) => void;
   onValueChange: (value: number) => void;
   onLevelChange: (level: Level) => void;
+  onFormatChange: (format: Format) => void;
+  onWarmupChange: (minutes: number | null) => void;
   onSimulationChange: (on: boolean) => void;
   onSoundChange: (on: boolean) => void;
   onGenerate: () => void;
   onBack: () => void;
-}) {
-  const { config } = props;
-  const s = SLIDER[config.mode];
+}
 
+export default function ConfigPage(props: Props) {
+  const { config } = props;
+  const s = SLIDER[config.activity][config.mode];
+  const w = {
+      max: 20,
+      min: 0,
+      step:1
+  }
   return (
     <>
       <div className="eyebrow">{SCREEN_TITLE.config}</div>
+      <h3>Activity</h3>
+      <ChoiceGroup value={config.activity} options={['run', 'bike'] as const} label={(a) => ACTIVITY_LABEL[a]} onChange={props.onActivityChange} />
+
       <h3>Goal</h3>
       <ChoiceGroup
         value={config.mode}
@@ -49,27 +61,24 @@ export default function ConfigPage(props: {
         onChange={props.onLevelChange}
       />
 
-      <div className="card muted">
-        GPS: requested only during the session (distance is measured, reliability is shown).
-        <br />
-        Steps: unavailable — {MESSAGES.stepsUnavailable}
-        <br />
-        Fallback: duration mode.
+      <h3>Format</h3>
+      <ChoiceGroup value={config.format} options={['intervals', 'steady'] as const} label={(f) => FORMAT_LABEL[f]} onChange={props.onFormatChange} />
+      <div className="muted">
+        {config.format === 'intervals' ? 'Alternate speed-ups and recoveries.' : 'One continuous, even effort: no speed-ups.'}
       </div>
 
-      <label>
+      <h3>Warm-up</h3>
+      <div>
+        <ChoiceGroup value={config.warmupMin} options={WARMUP_CHOICES} label={warmupLabel} onChange={props.onWarmupChange} />
+      </div>
+
+      {/* <label>
         <input type="checkbox" checked={config.sim} onChange={(e) => props.onSimulationChange(e.target.checked)} />{' '}
         GPS simulation (test without going outside)
       </label>
-      <br />
+      <br /> */}
       <label>
-        <input
-          type="checkbox"
-          checked={props.soundEnabled}
-          onChange={(e) => {
-            props.onSoundChange(e.target.checked);
-          }}
-        />{' '}
+        <input type="checkbox" checked={props.soundEnabled} onChange={(e) => props.onSoundChange(e.target.checked)} />{' '}
         Sounds and vibration (vibration unavailable on iPhone)
       </label>
       <br />

@@ -6,7 +6,7 @@ import { calendarGrid, groupByMonth, startOfWeek, weekStreak, weeklyTotals } fro
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
 const NOW = at(2026, 11, 1); // a Sunday
 const run = (date: number, distM: number, completed = true, elapsed = 1800): RunResult => ({
-  date, mode: 'time', level: 'beginner', completed, elapsed, distM, source: 'GPS', challenges: 3, xp: 50, sig: 's' + date, P: 1,
+  date, mode: 'time', level: 'beginner', activity: 'run', format: 'intervals', completed, elapsed, distM, source: 'GPS', challenges: 3, xp: 50, sig: 's' + date, P: 1,
 });
 
 describe('weeks', () => {
@@ -36,6 +36,11 @@ describe('calendar', () => {
     expect(g[2][0].level).toBe(0);
     expect(g[2][6].future).toBe(false); // Sunday Nov 1 = today
     expect(g[0][0].date).toBe(at(2026, 10, 12, 0));
+  });
+  it('heat thresholds are higher for the bike', () => {
+    const h = [run(at(2026, 10, 27), 12000)];
+    expect(calendarGrid(h, NOW, 1, 'run')[0][1].level).toBe(4);
+    expect(calendarGrid(h, NOW, 1, 'bike')[0][1].level).toBe(2);
   });
   it('streak counts consecutive weeks with a completed match', () => {
     const h = [run(at(2026, 10, 27), 1), run(at(2026, 10, 20), 1), run(at(2026, 10, 5), 1)];

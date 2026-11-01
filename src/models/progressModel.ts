@@ -1,5 +1,5 @@
 import { RECENT_SIGNATURES_COUNT, WEEK_MS } from './constants';
-import type { Level } from './constants';
+import type { Activity, Format, Level } from './constants';
 import type { RunDetail } from './detailModel';
 import type { Plan } from './planModel';
 import { computeXp, earnedBadges } from './rewardModel';
@@ -12,6 +12,8 @@ export interface RunResult {
   date: number;
   mode: 'time' | 'dist';
   level: Level;
+  activity: Activity; // 'run' for matches saved before the bike mode
+  format: Format; // 'intervals' for matches saved before the steady format
   completed: boolean;
   elapsed: number;
   distM: number;
@@ -40,6 +42,8 @@ export function normalizeProgress(raw: unknown): Progress {
     ...r,
     level: LEGACY_LEVELS[r.level] ?? r.level,
     challenges: r.challenges ?? r.defis ?? 0,
+    activity: r.activity ?? 'run',
+    format: r.format ?? 'intervals',
   }));
   return s;
 }
@@ -62,7 +66,7 @@ export function applyRun(progress: Progress, outcome: RunOutcome, config: RunCon
   const xp = computeXp({ ...outcome, allRecover: outcome.completed, week3 });
 
   const result: RunResult = {
-    date: now, mode: config.mode, level: config.level, completed: outcome.completed,
+    date: now, mode: config.mode, level: config.level, activity: config.activity, format: config.format, completed: outcome.completed,
     elapsed: outcome.elapsed, distM: outcome.distM, source: outcome.source, challenges: outcome.challenges,
     xp, sig: plan.sig, P: outcome.progress,
     ...(outcome.detail ? { detail: outcome.detail } : {}),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatClock, formatKm, formatPace, spokenPace } from './format';
+import { formatClock, formatEffort, formatKm, formatPace, kmhFromPace, spokenEffort, spokenPace } from './format';
 
 describe('format', () => {
   it('formatClock rounds up and never goes negative', () => {
@@ -24,5 +24,15 @@ describe('format', () => {
     expect(spokenPace(5.7)).toBe('5 minutes 42 seconds');
     expect(spokenPace(6)).toBe('6 minutes');
     expect(spokenPace(4 + 1 / 60)).toBe('4 minutes 1 second');
+  });
+  it('a run is shown as a pace, a ride as a speed', () => {
+    expect(formatEffort(5, 'run')).toBe('5:00 /km');
+    expect(formatEffort(2, 'bike')).toBe('30.0 km/h');
+    expect(formatEffort(null, 'run')).toBe('— /km');
+    expect(formatEffort(null, 'bike')).toBe('— km/h');
+    expect(kmhFromPace(3)).toBe(20);
+    expect(kmhFromPace(0)).toBe(null);
+    expect(spokenEffort(5.7, 'run')).toBe('5 minutes 42 seconds per kilometre');
+    expect(spokenEffort(2.2, 'bike')).toBe('27.3 kilometres per hour');
   });
 });

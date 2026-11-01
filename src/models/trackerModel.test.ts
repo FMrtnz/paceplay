@@ -26,4 +26,10 @@ describe('gps tracker', () => {
     expect(t.recentPaceMinKm(40000 + 11000)).toBe(null); // no fix for 11 s
     expect(new Tracker().recentPaceMinKm(0)).toBe(null);
   });
+  it('the speed limit depends on the activity', () => {
+    // 15 m/s is a jump for a runner but normal for a cyclist
+    const fast = (tr: Tracker) => { tr.add({ lat: 48, lon: 2, acc: 5, t: 0 }); return tr.add({ lat: 48 + 15 / 111320, lon: 2, acc: 5, t: 1000 }); };
+    expect(fast(new Tracker())).toBe(0);
+    expect(fast(new Tracker(0, 20))).toBeGreaterThan(14);
+  });
 });

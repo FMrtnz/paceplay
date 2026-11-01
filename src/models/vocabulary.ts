@@ -1,4 +1,4 @@
-import type { Kind, Level } from './constants';
+import type { Activity, Format, Kind, Level } from './constants';
 
 // All user-facing words live here (Quidditch-inspired). Change the wording in this file only.
 
@@ -12,6 +12,7 @@ export const PHASE_LABEL: Record<Kind, string> = {
   warmup: 'Warm-up',
   accel: 'Speed up',
   recover: 'Recover',
+  steady: 'Steady',
   cooldown: 'Cool-down',
 };
 
@@ -19,8 +20,19 @@ export const PHASE_TIP: Record<Kind, string> = {
   warmup: 'Walk or jog gently',
   accel: 'Controlled effort, at your own pace',
   recover: 'Slow down or walk',
+  steady: 'Hold an even, comfortable effort',
   cooldown: 'Easy pace',
 };
+
+export const ACTIVITY_LABEL: Record<Activity, string> = { run: 'Run', bike: 'Bike' };
+export const FORMAT_LABEL: Record<Format, string> = { intervals: 'Intervals', steady: 'Steady' };
+/** Running is measured as a pace (min/km), cycling as a speed (km/h). */
+export const EFFORT_LABEL: Record<Activity, { now: string; avg: string; column: string }> = {
+  run: { now: 'Pace', avg: 'Avg pace', column: 'Pace' },
+  bike: { now: 'Speed', avg: 'Avg speed', column: 'Speed' },
+};
+/** Label of a warm-up choice in minutes (null = automatic, 0 = none). */
+export const warmupLabel = (min: number | null) => (min === null ? 'Auto' : min === 0 ? 'None' : `${min} min`);
 
 export const SCREEN_TITLE = {
   home: 'Locker Room',

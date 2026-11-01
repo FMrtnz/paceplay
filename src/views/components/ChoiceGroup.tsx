@@ -1,5 +1,5 @@
 /** Button group for choosing one value among several. */
-export default function ChoiceGroup<T extends string | number>(props: {
+export default function ChoiceGroup<T extends string | number | null>(props: {
   value: T;
   options: T[];
   label: (v: T) => string;

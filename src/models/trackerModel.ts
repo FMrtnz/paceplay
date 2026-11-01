@@ -18,9 +18,10 @@ export class Tracker {
   n = 0;
   private samples: { t: number; d: number }[] = []; // (time, distance) after each accepted fix
 
-  constructor(public dist = 0) {}
+  /** `maxSpeedMs`: faster jumps between two fixes are rejected (7 m/s ≈ 25 km/h on foot). */
+  constructor(public dist = 0, private maxSpeedMs = 7) {}
 
-  /** Returns meters added. Rejects accuracy >30 m, jumps >25 km/h, jitter and repeated positions. */
+  /** Returns meters added. Rejects accuracy >30 m, jumps above the maximum speed, jitter and repeated positions. */
   add(f: Fix): number {
     if (f.acc > 30) { this.rejected++; return 0; }
     if (!this.last) { this.last = f; this.note(f); return 0; }
@@ -28,7 +29,7 @@ export class Tracker {
     if (dt <= 0) return 0;
     const d = haversine(this.last, f);
     if (d < Math.max(3, f.acc * 0.5)) return 0;
-    if (d / dt > 7) { this.rejected++; return 0; }
+    if (d / dt > this.maxSpeedMs) { this.rejected++; return 0; }
     this.last = f;
     this.dist += d;
     this.speed = d / dt;

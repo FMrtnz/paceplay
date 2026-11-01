@@ -1,5 +1,5 @@
 import { MIN_PARTIAL_KM_M } from './constants';
-import type { Kind } from './constants';
+import type { Activity, Format, Kind } from './constants';
 import { bestPhasePaceMinKm, kindPaceMinKm } from './detailModel';
 import { averagePaceMinKm, isApproximatePace, paceMinKm } from './paceModel';
 import type { RunResult } from './progressModel';
@@ -7,11 +7,14 @@ import type { RunResult } from './progressModel';
 export interface KmRow { index: number | null; distM: number; seconds: number; paceMinKm: number | null } // index null = last partial km
 export interface PhaseRow { kind: Kind; seconds: number; distM: number; paceMinKm: number | null; approx: boolean }
 export interface MatchView {
+  activity: Activity;
+  format: Format;
   avgPaceMinKm: number | null;
   hasDetail: boolean;
   kmRows: KmRow[];
   phaseRows: PhaseRow[];
   speedUpAvgMinKm: number | null;
+  steadyAvgMinKm: number | null;
   recoverAvgMinKm: number | null;
   bestSpeedUpMinKm: number | null;
 }
@@ -20,8 +23,8 @@ export interface MatchView {
 export function describeMatch(match: RunResult): MatchView {
   const d = match.detail;
   const view: MatchView = {
-    avgPaceMinKm: averagePaceMinKm(match.elapsed, match.distM),
-    hasDetail: !!d, kmRows: [], phaseRows: [], speedUpAvgMinKm: null, recoverAvgMinKm: null, bestSpeedUpMinKm: null,
+    activity: match.activity, format: match.format, avgPaceMinKm: averagePaceMinKm(match.elapsed, match.distM),
+    hasDetail: !!d, kmRows: [], phaseRows: [], speedUpAvgMinKm: null, steadyAvgMinKm: null, recoverAvgMinKm: null, bestSpeedUpMinKm: null,
   };
   if (!d) return view;
 
@@ -34,6 +37,7 @@ export function describeMatch(match: RunResult): MatchView {
   }));
   view.speedUpAvgMinKm = kindPaceMinKm(d, 'accel');
   view.recoverAvgMinKm = kindPaceMinKm(d, 'recover');
+  view.steadyAvgMinKm = kindPaceMinKm(d, 'steady');
   view.bestSpeedUpMinKm = bestPhasePaceMinKm(d, 'accel');
   return view;
 }
