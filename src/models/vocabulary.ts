@@ -45,6 +45,14 @@ export const SCREEN_TITLE = {
   trophies: 'Trophy Room',
 };
 
+/** Ending a run early asks for confirmation first (a stray tap must not stop a session). */
+export const END_RUN = {
+  button: 'End here (no penalty)',
+  ask: 'End this run now?',
+  keep: 'Keep going',
+  confirm: 'Yes, end it',
+};
+
 export const RESULT_TITLE = { completed: 'Snitch caught!', interrupted: 'Mission interrupted' };
 
 // Trophy ids are persisted (as `badges`): never rename them.

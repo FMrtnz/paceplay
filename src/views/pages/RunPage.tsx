@@ -1,4 +1,5 @@
-import { EFFORT_LABEL, PHASE_LABEL, PHASE_TIP, SCREEN_TITLE } from '../../models/vocabulary';
+import { useEffect, useState } from 'react';
+import { EFFORT_LABEL, END_RUN, PHASE_LABEL, PHASE_TIP, SCREEN_TITLE } from '../../models/vocabulary';
 import type { RunView } from '../../controllers/useRunController';
 import { formatClock, formatEffort, formatKm } from '../../utils/format';
 import Snitch from '../components/Snitch';
@@ -6,6 +7,17 @@ import Snitch from '../components/Snitch';
 /** Live session screen. Everything shown comes from the run controller. */
 export default function RunPage({ run }: { run: RunView }) {
   const { phaseKind } = run;
+  // Two-step end: the first tap only asks; the question disappears by itself after 6 s,
+  // and "Yes" ignores taps in the first 0.8 s so a double tap cannot confirm by accident.
+  const [askedAt, setAskedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (askedAt === null) return;
+    const id = setTimeout(() => setAskedAt(null), 6000);
+    return () => clearTimeout(id);
+  }, [askedAt]);
+  const confirmEnd = () => {
+    if (askedAt !== null && Date.now() - askedAt > 800) run.endEarly();
+  };
   return (
     <div className="w">
       <div className="eyebrow">{SCREEN_TITLE.run}</div>
@@ -33,7 +45,15 @@ export default function RunPage({ run }: { run: RunView }) {
       </div>
 
       <button className="big" onClick={run.togglePause}>{run.paused ? 'Resume' : 'Pause'}</button>
-      <button style={{ width: '100%' }} onClick={run.endEarly}>End here (no penalty)</button>
+      {askedAt === null ? (
+        <button style={{ width: '100%' }} onClick={() => setAskedAt(Date.now())}>{END_RUN.button}</button>
+      ) : (
+        <div className="card">
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>{END_RUN.ask}</div>
+          <button className="big" onClick={() => setAskedAt(null)}>{END_RUN.keep}</button>
+          <button style={{ width: '100%' }} onClick={confirmEnd}>{END_RUN.confirm}</button>
+        </div>
+      )}
       <p className="muted">Keep the screen on: Safari may suspend GPS in the background.</p>
     </div>
   );
