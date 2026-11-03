@@ -1,4 +1,3 @@
-import { PHASE_LABEL, PHASE_TIP } from '../models/vocabulary';
 import type { Kind } from '../models/constants';
 
 /** Sounds (Web Audio), vibration and voice. Vibration does not exist on Safari iOS: silently ignored.
@@ -6,9 +5,28 @@ import type { Kind } from '../models/constants';
  *  `enabled` comes from the user's preference, read by the controller.
  *
  *  Audio session: we stay in 'ambient' (mixes with the user's music, never interrupts it) and
- *  switch to 'transient' only while a sound/voice plays, so other audio is ducked, then restored. */
+ *  switch to 'transient' only while a sound/voice plays, so other audio is ducked, then restored.
+ *
+ *  The coach voice is NOT speechSynthesis (iOS cuts the user's music for it): it is a short audio clip per
+ *  phase (public/voice/<kind>.m4a, made by scripts/make-voice.sh) played through one <audio> element. */
 let ctx: AudioContext | null = null;
 let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+
+// ---- Coach voice clips ----
+const KINDS: Kind[] = ['warmup', 'accel', 'recover', 'steady', 'cooldown'];
+const SILENCE = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA=='; // 0.1 s of silence, played once inside the Start tap to unlock the element
+let voiceEl: HTMLAudioElement | null = null;
+const voiceReady: Partial<Record<Kind, Promise<string | null>>> = {}; // blob URL of each clip, null if missing
+
+/** Clips are fetched into blob URLs (works offline through the service worker, and avoids the Range requests
+ *  Safari sends for media, which a cache-first service worker cannot answer). */
+function loadVoice() {
+  for (const k of KINDS) {
+    voiceReady[k] ??= fetch(`${import.meta.env.BASE_URL}voice/${k}.m4a`)
+      .then(async (r) => (r.ok ? URL.createObjectURL(await r.blob()) : null))
+      .catch(() => null);
+  }
+}
 
 type SessionType = 'ambient' | 'transient';
 
@@ -26,9 +44,31 @@ function duckFor(ms: number) {
   releaseTimer = setTimeout(() => setSession('ambient'), ms + 300);
 }
 
+/** iOS may hold voice prompts that came due while the app was hidden and speak them all the moment the app
+ *  comes back to the front, which stops the user's music. On return: drop that backlog and make sure the
+ *  session is back to 'ambient' (a 'transient' left over from a timer that never fired would also cut the music). */
+let watchingVisibility = false;
+function settleAudioOnReturn() {
+  if (watchingVisibility) return;
+  watchingVisibility = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    try { speechSynthesis.cancel(); } catch {}
+    clearTimeout(releaseTimer);
+    setSession('ambient');
+  });
+}
+
 export function unlockAudio() {
   try {
+    settleAudioOnReturn();
     setSession('ambient'); // must be set BEFORE creating/resuming the AudioContext
+    loadVoice();
+    if (!voiceEl) {
+      voiceEl = new Audio();
+      voiceEl.src = SILENCE;
+      voiceEl.play().catch(() => {}); // unlocks this element for later cues, even with the screen locked
+    }
     const A = (window as any).AudioContext || (window as any).webkitAudioContext;
     ctx ??= new A();
     ctx!.resume();
@@ -66,17 +106,21 @@ export function vibrate(pattern: number | number[], enabled: boolean) {
   try { if (enabled) navigator.vibrate?.(pattern); } catch {}
 }
 
-/** Spoken prompt for a new phase, optionally preceded by the result of the previous one
- *  (e.g. the pace held during a speed-up). Not gated by the sound preference (as before). */
-export function announcePhase(kind: Kind, previousResult: string | null = null) {
+/** Voice prompt for a new phase (an audio clip). `previousResult` is no longer spoken: it needed live speech synthesis.
+ *  Not gated by the sound preference (as before). A missing clip is simply silent. */
+export function announcePhase(kind: Kind, _previousResult: string | null = null) {
   try {
-    const say = new SpeechSynthesisUtterance(`${previousResult ? previousResult + ' ' : ''}${PHASE_LABEL[kind]}. ${PHASE_TIP[kind]}`);
-    say.lang = 'en-US';
-    clearTimeout(releaseTimer);
-    setSession('transient');
-    const restore = () => setSession('ambient');
-    say.onend = restore;
-    say.onerror = restore;
-    speechSynthesis.speak(say);
+    const el = voiceEl;
+    if (!el) return;
+    (voiceReady[kind] ?? Promise.resolve(null)).then((url) => {
+      if (!url) return;
+      clearTimeout(releaseTimer);
+      setSession('transient');
+      const restore = () => setSession('ambient');
+      el.onended = restore;
+      el.onerror = restore;
+      el.src = url;
+      el.play().catch(restore);
+    });
   } catch {}
 }
