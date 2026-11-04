@@ -1,82 +1,124 @@
-import type { Plan } from './models/planModel';
-import type { RunConfig, RunOutcome } from './models/sessionModel';
-import { useAppController } from './controllers/useAppController';
-import type { PlanResult } from './controllers/useSetupController';
-import { useRunController } from './controllers/useRunController';
-import BottomNav from './views/components/BottomNav';
-import type { NavTab } from './views/components/BottomNav';
-import Logo from './views/components/Logo';
-import ShareSheet from './views/components/ShareSheet';
-import HomePage from './views/pages/HomePage';
-import ConfigPage from './views/pages/ConfigPage';
-import PreviewPage from './views/pages/PreviewPage';
-import RunPage from './views/pages/RunPage';
-import ResultPage from './views/pages/ResultPage';
-import ProgressPage from './views/pages/ProgressPage';
-import MatchPage from './views/pages/MatchPage';
-import TrophyPage from './views/pages/TrophyPage';
+import { useEffect, useRef, useState } from 'react';
+import { buildPlan, phaseAt, renderTrack, totalSeconds, type Params, type Phase } from './fartlek';
 
-/** Mounts the run controller only while a session is on screen (it owns timers and GPS). */
-function RunRoute(props: { plan: Plan; config: RunConfig; soundEnabled: boolean; onEnd: (o: RunOutcome) => void }) {
-  const run = useRunController(props);
-  return <RunPage run={run} />;
+type Mode = 'playback' | 'transient' | 'ambient'; // the audio session type used for the beep track
+type Settings = Params & { mode: Mode };
+const MODES: [Mode, string][] = [
+  ['playback', 'Beeps with screen locked (music pauses)'],
+  ['transient', 'TEST: beeps with screen locked, mixed with music'],
+  ['ambient', 'Music keeps playing (screen stays on)'],
+];
+const LABEL = { warmup: 'Warm-up', intense: 'GO! Intense', recovery: 'Recover' } as const;
+const KEY = 'fartlek:settings3';
+const DEFAULTS: Settings = { warmupMin: 20, fartlekMin: 10, mode: 'playback' };
+const mmss = (s: number) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const load = (): Settings => { try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return DEFAULTS; } };
+
+/** Keeps the screen on, asking again each time the app comes back to the front (the browser drops the lock when hidden). */
+function useWakeLock(on: boolean) {
+  useEffect(() => {
+    if (!on) return;
+    let lock: any, stop = false;
+    const get = () => (navigator as any).wakeLock?.request('screen').then((l: any) => { if (stop) l.release(); else lock = l; }).catch(() => {});
+    const vis = () => { if (document.visibilityState === 'visible') get(); };
+    get();
+    document.addEventListener('visibilitychange', vis);
+    return () => { stop = true; document.removeEventListener('visibilitychange', vis); lock?.release?.(); };
+  }, [on]);
 }
 
-/** The only place that talks to the user about a failed generation. */
-const alertIfFailed = (r: PlanResult) => { if (!r.ok) alert(r.error); };
-/** Deleting is destructive: ask first. */
-const confirmDelete = () => confirm('Delete this match? Its XP will be removed (trophies are kept).');
+function Setup({ msg, onStart }: { msg: string; onStart: (s: Settings) => void }) {
+  const [s, setS] = useState(load);
+  const num = (k: 'warmupMin' | 'fartlekMin', label: string, unit: string) => (
+    <label className="row">{label}
+      <span><input type="number" inputMode="numeric" min={0} value={s[k]} onChange={(e) => setS({ ...s, [k]: Math.max(0, Number(e.target.value) || 0) })} /> {unit}</span>
+    </label>
+  );
+  return (
+    <main>
+      <h1>Fartlek</h1>
+      {msg && <p className="ok">{msg}</p>}
+      {num('warmupMin', 'Warm-up', 'min')}
+      {num('fartlekMin', 'Fartlek', 'min')}
+      <label className="row">Sound
+        <select value={s.mode} onChange={(e) => setS({ ...s, mode: e.target.value as Mode })}>
+          {MODES.map(([m, label]) => <option key={m} value={m}>{label}</option>)}
+        </select>
+      </label>
+      <p className="muted">Total {mmss((s.warmupMin + s.fartlekMin) * 60)} · the fartlek efforts and recoveries are drawn at random when you start</p>
+      <button className="go" disabled={!s.fartlekMin} onClick={() => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} onStart(s); }}>Start</button>
+    </main>
+  );
+}
+
+function Run({ audio, plan, mode, onExit }: { audio: HTMLAudioElement; plan: Phase[]; mode: Mode; onExit: (done: boolean) => void }) {
+  const [t, setT] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [askedAt, setAskedAt] = useState<number | null>(null);
+  const total = totalSeconds(plan);
+  useWakeLock(mode === 'ambient'); // a mixed (ambient) sound is muted when the screen locks, so keep it on
+  useEffect(() => { // the audio track is the clock: the screen only reads its position
+    const id = setInterval(() => setT(audio.currentTime), 250);
+    const end = () => onExit(true), pause = () => setPaused(true), play = () => setPaused(false);
+    audio.addEventListener('ended', end); audio.addEventListener('pause', pause); audio.addEventListener('play', play);
+    return () => { clearInterval(id); audio.removeEventListener('ended', end); audio.removeEventListener('pause', pause); audio.removeEventListener('play', play); };
+  }, [audio]);
+  useEffect(() => {
+    if (askedAt === null) return;
+    const id = setTimeout(() => setAskedAt(null), 6000);
+    return () => clearTimeout(id);
+  }, [askedAt]);
+  const cur = phaseAt(plan, t);
+  return (
+    <main className={`run ${cur?.phase.kind ?? 'recovery'}`}>
+      <div className="top"><b>{mmss(t)}</b> / {mmss(total)}</div>
+      <div className="mid">
+        <div className="label">{cur ? LABEL[cur.phase.kind] : 'Done'}</div>
+        <div className="big">{mmss(cur ? cur.left : 0)}</div>
+      </div>
+      <div className="bar"><i style={{ width: `${Math.min(100, (t / total) * 100)}%` }} /></div>
+      <div className="muted">Step {cur ? cur.index + 1 : plan.length}/{plan.length}</div>
+      <button onClick={() => (paused ? audio.play() : audio.pause())}>{paused ? 'Resume' : 'Pause'}</button>
+      {askedAt === null ? (
+        <button className="quiet" onClick={() => setAskedAt(Date.now())}>End session</button>
+      ) : (
+        <div className="ask">
+          <b>End this session now?</b>
+          <button className="go" onClick={() => setAskedAt(null)}>Keep going</button>
+          <button className="quiet" onClick={() => { if (Date.now() - askedAt > 800) onExit(false); }}>Yes, end it</button>
+        </div>
+      )}
+    </main>
+  );
+}
 
 export default function App() {
-  const app = useAppController();
-  const { setup, progress, match, matchView, share } = app;
+  const [run, setRun] = useState<{ audio: HTMLAudioElement; plan: Phase[]; mode: Mode; url: string } | null>(null);
+  const [msg, setMsg] = useState('');
+  const runRef = useRef(run);
+  runRef.current = run;
 
-  if (app.screen === 'run' && setup.plan) {
-    return <RunRoute plan={setup.plan} config={setup.config} soundEnabled={setup.soundEnabled} onEnd={app.finishRun} />;
+  // Everything that needs the tap (sound unlock) happens here, inside the Start click.
+  function start(s: Settings) {
+    const plan = buildPlan(s);
+    const url = URL.createObjectURL(new Blob([renderTrack(plan)], { type: 'audio/wav' }));
+    const audio = new Audio(url);
+    try { (navigator as any).audioSession.type = s.mode; } catch {}
+    audio.play().catch(() => {});
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: 'Fartlek', artist: 'Intervals' });
+      navigator.mediaSession.setActionHandler('play', () => audio.play());
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+    } catch {}
+    setMsg('');
+    setRun({ audio, plan, mode: s.mode, url });
   }
-
-  // The bottom bar belongs to the browsing screens, not to the setup / result flow
-  const nav: NavTab | null = app.screen === 'home' ? 'home' : app.screen === 'trophies' ? 'trophies'
-    : app.screen === 'progress' || app.screen === 'match' ? 'progress' : null;
-  const selectTab = (t: NavTab) => (t === 'home' ? app.goHome() : t === 'progress' ? app.openProgress() : app.openTrophies());
-
-  return (
-    <div className="w">
-      <header className="brand"><Logo /><h1>PACEPLAY</h1></header>
-      {app.screen === 'home' && <HomePage summary={progress.summary} onStart={app.openConfig} />}
-      {app.screen === 'config' && (
-        <ConfigPage
-          config={setup.config} soundEnabled={setup.soundEnabled}
-          onModeChange={setup.setMode} onValueChange={setup.setValue} onLevelChange={setup.setLevel}
-          onActivityChange={setup.setActivity} onFormatChange={setup.setFormat} onWarmupChange={setup.setWarmup}
-          onSimulationChange={setup.setSimulation} onSoundChange={setup.setSoundEnabled}
-          onGenerate={() => alertIfFailed(app.generatePlan())} onBack={app.goHome}
-        />
-      )}
-      {app.screen === 'preview' && setup.plan && (
-        <PreviewPage
-          plan={setup.plan} config={setup.config} repeated={setup.repeated} onStart={app.startRun}
-          onAnother={() => alertIfFailed(app.generateAnotherPlan())} onBack={app.openConfig}
-        />
-      )}
-      {app.screen === 'result' && app.lastRun && (
-        <ResultPage
-          result={app.lastRun.result} newBadges={app.lastRun.newBadges}
-          onShare={share.openSheet} onViewMatch={() => app.openMatch(app.lastRun!.result.date)} onHome={app.goHome}
-        />
-      )}
-      {app.screen === 'progress' && (
-        <ProgressPage
-          xp={progress.summary.xp} monthGroups={progress.monthGroups} stats={progress.statsByActivity} streak={progress.streak}
-          onOpenMatch={app.openMatch} onDeleteMatch={(date) => { if (confirmDelete()) progress.deleteRun(date); }}
-        />
-      )}
-      {app.screen === 'match' && match && matchView && (
-        <MatchPage match={match} view={matchView} onShare={share.openSheet} onBack={app.openProgress} />
-      )}
-      {app.screen === 'trophies' && <TrophyPage earnedIds={progress.earnedTrophyIds} />}
-      {nav && <BottomNav current={nav} onSelect={selectTab} />}
-      {share.open && <ShareSheet share={share} />}
-    </div>
-  );
+  function exit(done: boolean) {
+    const r = runRef.current;
+    if (r) { r.audio.pause(); URL.revokeObjectURL(r.url); }
+    try { navigator.mediaSession.metadata = null; } catch {}
+    setMsg(done ? 'Session complete. Well done!' : '');
+    setRun(null);
+  }
+  return run ? <Run audio={run.audio} plan={run.plan} mode={run.mode} onExit={exit} /> : <Setup msg={msg} onStart={start} />;
 }
